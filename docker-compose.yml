@@ -1,0 +1,67 @@
+# Local development stack: React (nginx) + FastAPI + MySQL.
+# Start with:  cp .env.example .env   (edit the passwords)   then   docker compose up --build
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${DB_NAME:-dragonwok}
+      MYSQL_USER: ${DB_USER:-dragonwok}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql_data:/var/lib/mysql          # data survives restarts
+    ports:
+      - "127.0.0.1:3306:3306"              # reachable from this computer only, never from the network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [backend_net]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      DB_HOST: db                          # the service name on the internal Docker network
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-dragonwok}
+      DB_USER: ${DB_USER:-dragonwok}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_SSL_ENABLED: "false"              # local MySQL container has no public certificate
+      DELIVERY_FEE: ${DELIVERY_FEE:-40.00}
+      TAX_RATE: ${TAX_RATE:-0.05}
+      FREE_DELIVERY_ABOVE: ${FREE_DELIVERY_ABOVE:-0}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      RUN_MIGRATIONS: "true"
+      RUN_SEED: ${RUN_SEED:-true}
+    ports:
+      - "8000:8000"
+    networks: [backend_net, frontend_net]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "3000:80"
+    networks: [frontend_net]
+
+networks:
+  backend_net:      # backend <-> database only
+  frontend_net:
+
+volumes:
+  mysql_data:
