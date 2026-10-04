@@ -18,7 +18,7 @@ A Chinese restaurant web app with a clear three-tier design. Customers browse th
 
 ## 2. Technology
 
-| Tier | Tools |
+| Tier | Tools - All|
 |---|---|
 | Presentation | React 18, React Router, Vite, plain CSS |
 | Application | Python 3.12, FastAPI, SQLAlchemy 2, Pydantic 2, Alembic, PyJWT, bcrypt |
